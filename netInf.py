@@ -31,10 +31,6 @@ def initialize_DAG(cascade,epsilon):
         T.add_edge(node_list[node_index-1],node_list[node_index],weight=0)
     return T
 
-#TODO Make brute force
-def bf_DAG(cascade):
-    return
-
 def NetInf(k, graph_name, number_of_cascades, cascade_directory, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
     #
     #Initialization
@@ -114,7 +110,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, time_evaluator=
                     the_active_tree = tree_list[c]
                     
                     #calculate the new weight
-                    new_weight = np.log(beta * time_evaluator(the_active_tree.node[i]['time'] - the_active_tree.node[i]['time'])) - np.log(epsilon)
+                    new_weight = np.log(beta * time_evaluator(the_active_tree.node[i]['time'] - the_active_tree.node[j]['time'])) - np.log(epsilon)
                     #if the new weight is bigger than the old
                     old_weight = the_active_tree[the_active_tree.node[i]['parent']][i]['weight']
                     if(new_weight >= old_weight):
@@ -156,7 +152,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, time_evaluator=
             tree_list[c].node[max_pair[1]]['parent'] = max_pair[0]
         #end
         G.add_edge(max_pair[0],max_pair[1])
-        
+        return G
     #end
     
     f = open(cascade_directory + graph_name + '_NETINF.p','wb')
