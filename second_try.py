@@ -24,11 +24,10 @@ cascade_list = []
 not_seen_list = []
 cascade_adjacencies = []
 
-def find_next_link_BF_no_iter(input):
-    j,i,beta, epsilon, missing_p = input
+def change_the_adj(adj_to_change, i,j, beta, epsilon, missing_p):
     time_evaluator = stats.expon.pdf
     delta = 0
-    for c in range(len(cascade_list)):
+    for c in adj_to_change:
         current_cascade = cascade_list[c]
         A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
         already_selected = [current_cascade[0][1]] #add index of source
@@ -61,16 +60,14 @@ def find_next_link_BF_no_iter(input):
                 continue
             A[x,:] = A[x,:] * np.zeros(shape=(1,len(A[x,:])))
         
-        for index in range(len(current_cascade)):
-            delta = delta + max(np.log(A[np.argmax(A[:,index]),index]) - np.log(epsilon),0) 
-    #end
-    print((j,i))
-    return (delta, (j,i))
+        cascade_adjacencies[c] = A
+    return
 
 def find_next_link_with_adj_no_iter(input):
     j,i,beta, epsilon, missing_p = input
     time_evaluator = stats.expon.pdf
     delta = 0
+    adjs_to_change = []
     for c in range(len(cascade_list)):
         #we split this into 4 cases
         if(j not in cascade_list[c].nodes()):
@@ -80,19 +77,43 @@ def find_next_link_with_adj_no_iter(input):
                 continue
             
             #1b) the child is in the cascade but the parent is not
+            max_double_jump_weight = 0
+            max_index = -1
+            for x in G.predecessors(j):
+                if(cascade_list[c].node[x]['time'] > cascade_list[c].node[i]['time']):
+                    continue
+                double_jump_weight = np.log(beta * beta * missing_p * \
+                    ((time_evaluator(cascade_list[c].node[i]['time'] - cascade_list[c].node[x]['time'])/2)**2) ) - np.log(epsilon)
+                if(double_jump_weight > max_double_jump_weight and double_jump_weight > np.max(cascade_adjacencies[c][:,i])):
+                    max_index = x
+                    max_double_jump_weight = double_jump_weight
             
+            if(max_double_jump_weight > 0):
+                delta = delta + max_double_jump_weight - np.max(cascade_adjacencies[c][:,i])
+                adj_to_change.append(c)
         elif(i not in cascade_list[c].nodes()):
             #2) if the child is not in the cascade but the parent is
-            
-            
+            max_double_jump_weight = 0
+            max_index = -1
+            for x in G.sucessors(i):
+                if(cascade_list[c].node[x]['time'] < cascade_list[c].node[j]['time']):
+                    continue
+                double_jump_weight = beta * beta * missing_p * \
+                    ((time_evaluator(cascade_list[c].node[x]['time'] - cascade_list[c].node[j]['time'])/2)**2) ) - np.log(epsilon)
+            if(max_double_jump_weight > 0):
+                delta = delta + max_double_jump_weight - np.max(cascade_adjacencies[c][:,i])
+                adj_to_change.append(c)
         elif(cascade_list[c].node[i]['time'] < cascade_list[c].node[j]['time']):
             #3) both are in the cascade but the parent appears after the child
             continue
         elif(i in cascade_list[c].nodes() and j in cascade_list[c].nodes()):
-            
-            
-        current_cascade = cascade_list[c]
-        
+            #4) j preceeds i, both in the cascades
+            new_weight = np.log(beta * time_evaluator(cascade_list[c].node[i]['time'] - cascade_list[c].node[j]['time'])) - np.log(epsilon)
+            old_weight = np.argmax(cascade_adjacencies[c][:,i])
+            if(new_weight > old_weight)
+                delta = delta + new_weight - old_weight 
+                adj_to_change.append(c)
+    return (delta, (j,i), adj_to_change)
     
 
 def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
@@ -166,9 +187,11 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
             if output_tuple[0] > max_delta:
                 max_delta = output_tuple[0]
                 max_pair = output_tuple[1]
-        
+                adj_to_change = adj_to_change
         print(max_delta)
         print(max_pair)
+        
+        change_the_adj(adj_to_change, i, j, beta, epsilon, missing_p)
         #end
         
         #ok so we found the max_delta
