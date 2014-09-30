@@ -183,7 +183,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, num_threads = 8
             active_set.append((j,i))
         
         #determine block size
-        block_size = len(active_set)//(num_threads)
+        block_size = len(active_set)//(num_threads) + 1
         #remainder = len(active_set) - (block_size * num_threads)
         
         #create oiik

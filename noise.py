@@ -34,4 +34,4 @@ def noise_the_data(graph_name,cascade_directory,number_of_cascades , p= 0.01):
     
 
 if __name__ == '__main__':
-    noise_the_data('ba_100','./cascade_data/',500)
+    noise_the_data('ba_50','./cascade_data/',500)

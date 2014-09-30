@@ -22,13 +22,13 @@ def diff(a, b):
 G = nx.Graph()
 cascade_list = []
 not_seen_list = []
+cascade_adjacencies = []
 
 def find_next_link_BF_no_iter(input):
     j,i,beta, epsilon, missing_p = input
     time_evaluator = stats.expon.pdf
     delta = 0
     for c in range(len(cascade_list)):
-        #if i preceeds j in this cascade
         current_cascade = cascade_list[c]
         A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
         already_selected = [current_cascade[0][1]] #add index of source
@@ -67,6 +67,33 @@ def find_next_link_BF_no_iter(input):
     print((j,i))
     return (delta, (j,i))
 
+def find_next_link_with_adj_no_iter(input):
+    j,i,beta, epsilon, missing_p = input
+    time_evaluator = stats.expon.pdf
+    delta = 0
+    for c in range(len(cascade_list)):
+        #we split this into 4 cases
+        if(j not in cascade_list[c].nodes()):
+            #1) if the parent is not in the cascade
+            if(i not in cascade_list[c].nodes()):
+                #1a) if both the parent and the child are not in the cascade
+                continue
+            
+            #1b) the child is in the cascade but the parent is not
+            
+        elif(i not in cascade_list[c].nodes()):
+            #2) if the child is not in the cascade but the parent is
+            
+            
+        elif(cascade_list[c].node[i]['time'] < cascade_list[c].node[j]['time']):
+            #3) both are in the cascade but the parent appears after the child
+            continue
+        elif(i in cascade_list[c].nodes() and j in cascade_list[c].nodes()):
+            
+            
+        current_cascade = cascade_list[c]
+        
+    
 
 def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
     #
@@ -85,12 +112,15 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
     #
     #Initial Trees(!)
     #
+    global cascade_adjacencies
+    
     for c in range(number_of_cascades):
         f = open(cascade_directory + graph_name + '/' +graph_name + '_' + str(c) + '.p', 'rb')
         current_cascade = pickle.load(f)
         f.close()
         
         cascade_list.append(current_cascade);
+        cascade_adjacencies.append(np.zeros(size(len(G.nodes()))))
     
     for c in range(number_of_cascades):
         not_seen_list.append(diff(G.nodes(), [tuple[1] for tuple in cascade_list[c]]))
