@@ -32,8 +32,7 @@ def change_the_adj(adj_to_change, i,j, beta, epsilon, missing_p):
     delta = 0
     for c in adj_to_change:
         current_cascade = cascade_list[c]
-        A = np.ones(shape=(len(G.nodes()),len(G.nodes())))
-        A = A * epsilon
+        A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
         already_selected = [current_cascade[0][1]] #add index of source
         for index in range(len(current_cascade)):
             if(index == 0):
@@ -44,26 +43,25 @@ def change_the_adj(adj_to_change, i,j, beta, epsilon, missing_p):
                     if( ((current_cascade[parent_index][1],x) in G.edges() or ((j,i) == (current_cascade[parent_index][1],x))) \
                         and ((x,current_cascade[index][1]) in G.edges() or ((j,i) == (current_cascade[index][1],x)))):
                         # P(j,x)*P(x,i) = p \beta^2 * (\frac{1}{2} * \Delta_{j,i})
-                        A[x,index] = missing_p * beta * beta\
+                        A[x,current_cascade[index][1]] = missing_p * beta * beta\
                             * (time_evaluator((current_cascade[index][0] - current_cascade[parent_index][0])/2) ** 2)
                 #end
                 if( ((current_cascade[parent_index][1],current_cascade[index][1]) in G.edges()) or \
                     ((current_cascade[parent_index][1],current_cascade[index][1]) == (j,i))):
-                    A[parent_index,index] = beta * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
+                    A[current_cascade[parent_index][1],current_cascade[index][1]] = beta * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
                 else:
-                    A[parent_index,index] = epsilon * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
-                
+                    A[current_cascade[parent_index][1],current_cascade[index][1]] = epsilon * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
             #end
         #select parents
         #this sub-problem is NP-hard?
-        for x in not_seen_list[c]:
+        '''for x in not_seen_list[c]:
             index = np.argmax(A[x,:])
             while(np.argmax(A[:,index]) != x and A[x,index] != 0):
                 A[x,index] = 0
             if(A[x,index] == 0):
                 continue
             A[x,:] = A[x,:] * np.zeros(shape=(1,len(A[x,:])))
-        
+        '''
         cascade_adjacencies[c] = A
     return
 
@@ -83,18 +81,17 @@ def find_next_link_with_adj_no_iter(input):
             #1b) the child is in the cascade but the parent is not
             max_double_jump_weight = 0
             max_index = -1
-            current_max = np.log(np.max(np.max(cascade_adjacencies[c][:,i]),epsilon)) - LOG_EPSILON
+            current_max = np.log(np.max(cascade_adjacencies[c][:,i])) - LOG_EPSILON
             for x in G.predecessors(j):
                 if(x in not_seen_list[c]):
                     continue
                 if(timings[c][x] > timings[c][i]):
-                        continue
+                    continue
                 double_jump_weight = np.log(beta * beta * missing_p * \
                     ((time_evaluator(timings[c][i] - timings[c][x])/2)**2) ) - LOG_EPSILON
                 if(double_jump_weight > max_double_jump_weight and double_jump_weight > current_max):
                     max_index = x
                     max_double_jump_weight = double_jump_weight
-            
             if(max_double_jump_weight > 0):
                 delta = delta + max_double_jump_weight - current_max
                 adj_to_change.append(c)
@@ -107,7 +104,7 @@ def find_next_link_with_adj_no_iter(input):
                     continue
                 if(timings[c][x] < timings[c][j]):
                     continue
-                current_max = np.log(np.max(np.max(cascade_adjacencies[c][:,x]),epsilon)) - LOG_EPSILON
+                current_max = np.log(np.max(cascade_adjacencies[c][:,x])) - LOG_EPSILON
                 double_jump_weight = (beta * beta * missing_p * \
                     ((time_evaluator(timings[c][x] - timings[c][j])/2)**2))  - LOG_EPSILON
                 if(double_jump_weight > max_double_jump_weight and double_jump_weight > current_max):
@@ -156,7 +153,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
         f.close()
         
         cascade_list.append(current_cascade);
-        cascade_adjacencies.append(np.ones(shape=(len(G.nodes()),len(G.nodes())))*epsilon)
+        cascade_adjacencies.append(np.zeros(shape=(len(G.nodes()),len(G.nodes()))))
     
     for c in range(number_of_cascades):
         not_seen_list.append(diff(G.nodes(), [tuple[1] for tuple in cascade_list[c]]))
@@ -166,8 +163,10 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
     #
     #Actual Algorithm
     #
+    change_the_adj(range(number_of_cascades), -1, -1, beta, epsilon, missing_p)
     overall_start = time.time()
     for i in range(k):
+        
         print(i)
         start = time.time()
         #initial shifts
@@ -201,8 +200,6 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
         pool.close()
         pool.join()
         for output_tuple in output:
-            #print('snap')
-            #print(output_tuple[1])
             #output_tuple = output_result.get(timeout=1)
             if output_tuple[0] > max_delta:
                 max_delta = output_tuple[0]
