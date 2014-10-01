@@ -10,15 +10,15 @@ import pickle
 
 beta = 0.7
 cascade_directory = './cascade_data/'
-graph_name = 'ba_100'
-number_of_cascades = 100
+graph_name = 'ba_50'
+number_of_cascades = 50
 
 def diff(a, b):
     b = set(b)
     return [aa for aa in a if aa not in b]
 
 
-f = open(cascade_directory + graph_name + '_NETINF_mult.p','rb')
+f = open(cascade_directory + graph_name + '_newINF_mult.p','rb')
 G = pickle.load(f)
 f.close()
 

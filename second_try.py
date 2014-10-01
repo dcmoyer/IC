@@ -14,22 +14,26 @@ import matplotlib.pyplot as pl
 import csv
 from scipy import stats
 from multiprocessing import Pool
+import time
 
 def diff(a, b):
     b = set(b)
     return [aa for aa in a if aa not in b]
 
-G = nx.Graph()
+G = nx.DiGraph()
 cascade_list = []
 not_seen_list = []
 cascade_adjacencies = []
+timings = []
+LOG_EPSILON = 1
 
 def change_the_adj(adj_to_change, i,j, beta, epsilon, missing_p):
     time_evaluator = stats.expon.pdf
     delta = 0
     for c in adj_to_change:
         current_cascade = cascade_list[c]
-        A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
+        A = np.ones(shape=(len(G.nodes()),len(G.nodes())))
+        A = A * epsilon
         already_selected = [current_cascade[0][1]] #add index of source
         for index in range(len(current_cascade)):
             if(index == 0):
@@ -67,65 +71,75 @@ def find_next_link_with_adj_no_iter(input):
     j,i,beta, epsilon, missing_p = input
     time_evaluator = stats.expon.pdf
     delta = 0
-    adjs_to_change = []
+    adj_to_change = []
     for c in range(len(cascade_list)):
         #we split this into 4 cases
-        if(j not in cascade_list[c].nodes()):
+        if(j in not_seen_list[c]):
             #1) if the parent is not in the cascade
-            if(i not in cascade_list[c].nodes()):
+            if(i in not_seen_list[c]):
                 #1a) if both the parent and the child are not in the cascade
                 continue
             
             #1b) the child is in the cascade but the parent is not
             max_double_jump_weight = 0
             max_index = -1
+            current_max = np.log(np.max(np.max(cascade_adjacencies[c][:,i]),epsilon)) - LOG_EPSILON
             for x in G.predecessors(j):
-                if(cascade_list[c].node[x]['time'] > cascade_list[c].node[i]['time']):
+                if(x in not_seen_list[c]):
                     continue
+                if(timings[c][x] > timings[c][i]):
+                        continue
                 double_jump_weight = np.log(beta * beta * missing_p * \
-                    ((time_evaluator(cascade_list[c].node[i]['time'] - cascade_list[c].node[x]['time'])/2)**2) ) - np.log(epsilon)
-                if(double_jump_weight > max_double_jump_weight and double_jump_weight > np.max(cascade_adjacencies[c][:,i])):
+                    ((time_evaluator(timings[c][i] - timings[c][x])/2)**2) ) - LOG_EPSILON
+                if(double_jump_weight > max_double_jump_weight and double_jump_weight > current_max):
                     max_index = x
                     max_double_jump_weight = double_jump_weight
             
             if(max_double_jump_weight > 0):
-                delta = delta + max_double_jump_weight - np.max(cascade_adjacencies[c][:,i])
+                delta = delta + max_double_jump_weight - current_max
                 adj_to_change.append(c)
-        elif(i not in cascade_list[c].nodes()):
+        elif(i in not_seen_list[c]):
             #2) if the child is not in the cascade but the parent is
             max_double_jump_weight = 0
             max_index = -1
-            for x in G.sucessors(i):
-                if(cascade_list[c].node[x]['time'] < cascade_list[c].node[j]['time']):
+            for x in G.successors(i):
+                if(x in not_seen_list[c]):
                     continue
-                double_jump_weight = beta * beta * missing_p * \
-                    ((time_evaluator(cascade_list[c].node[x]['time'] - cascade_list[c].node[j]['time'])/2)**2) ) - np.log(epsilon)
+                if(timings[c][x] < timings[c][j]):
+                    continue
+                current_max = np.log(np.max(np.max(cascade_adjacencies[c][:,x]),epsilon)) - LOG_EPSILON
+                double_jump_weight = (beta * beta * missing_p * \
+                    ((time_evaluator(timings[c][x] - timings[c][j])/2)**2))  - LOG_EPSILON
+                if(double_jump_weight > max_double_jump_weight and double_jump_weight > current_max):
+                    max_index = x
+                    max_double_jump_weight = double_jump_weight
             if(max_double_jump_weight > 0):
-                delta = delta + max_double_jump_weight - np.max(cascade_adjacencies[c][:,i])
+                delta = delta + max_double_jump_weight - current_max
                 adj_to_change.append(c)
-        elif(cascade_list[c].node[i]['time'] < cascade_list[c].node[j]['time']):
+        elif(timings[c][i] < timings[c][j]):
             #3) both are in the cascade but the parent appears after the child
             continue
-        elif(i in cascade_list[c].nodes() and j in cascade_list[c].nodes()):
+        elif(i not in not_seen_list[c] and j not in not_seen_list[c]):
             #4) j preceeds i, both in the cascades
-            new_weight = np.log(beta * time_evaluator(cascade_list[c].node[i]['time'] - cascade_list[c].node[j]['time'])) - np.log(epsilon)
-            old_weight = np.argmax(cascade_adjacencies[c][:,i])
-            if(new_weight > old_weight)
+            new_weight = np.log(beta * time_evaluator(timings[c][i] - timings[c][j])) - LOG_EPSILON
+            old_weight = np.log(np.max(cascade_adjacencies[c][:,i])) - LOG_EPSILON
+            if(new_weight > old_weight):
                 delta = delta + new_weight - old_weight 
                 adj_to_change.append(c)
     return (delta, (j,i), adj_to_change)
     
 
-def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
+def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verbose=False, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
     #
     #Initialization
     #
     global G
-    G = nx.Graph()
+    G = nx.DiGraph()
     f = open(cascade_directory + graph_name + '.p','rb')
     G.add_nodes_from(pickle.load(f))
     f.close()
-    
+    global LOG_EPSILON
+    LOG_EPSILON = np.log(epsilon)
     global cascade_list
     cascade_list = []
     global not_seen_list
@@ -134,6 +148,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
     #Initial Trees(!)
     #
     global cascade_adjacencies
+    global timings
     
     for c in range(number_of_cascades):
         f = open(cascade_directory + graph_name + '/' +graph_name + '_' + str(c) + '.p', 'rb')
@@ -141,17 +156,20 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
         f.close()
         
         cascade_list.append(current_cascade);
-        cascade_adjacencies.append(np.zeros(size(len(G.nodes()))))
+        cascade_adjacencies.append(np.ones(shape=(len(G.nodes()),len(G.nodes())))*epsilon)
     
     for c in range(number_of_cascades):
         not_seen_list.append(diff(G.nodes(), [tuple[1] for tuple in cascade_list[c]]))
     
-    
+    for c in range(number_of_cascades):
+        timings.append({node_id : time for time,node_id in cascade_list[c]})
     #
     #Actual Algorithm
     #
+    overall_start = time.time()
     for i in range(k):
         print(i)
+        start = time.time()
         #initial shifts
         #deltas = np.zeros(shape=(len(G.nodes())))
         
@@ -159,13 +177,12 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
         max_pair = None
                 
         active_set = []
-        
         for j,i in [(x,y) for x in range(len(G.nodes())) for y in range(len(G.nodes()))]:
             #no self loops
             if(i==j):
                 continue
             #don't add edges already in the graph
-            if((j,i) in G.edges()):
+            if((j,i) in G.edges() or (i,j) in G.edges()):
                 continue
             active_set.append((j,i))
         
@@ -179,29 +196,36 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, num_
         #tasks = [(pair[0],pair[0]+1, pair[1], pair[1]+1, beta, time_evaluator, tree_list) for pair in active_set]
         
         tasks = [(pair[0], pair[1], beta, epsilon, missing_p) for pair in active_set]
-        output = pool.imap(find_next_link_BF_no_iter,tasks, block_size)
+        output = pool.imap(find_next_link_with_adj_no_iter,tasks, block_size)
+        #output = map(find_next_link_with_adj_no_iter, tasks)
         pool.close()
         pool.join()
         for output_tuple in output:
+            #print('snap')
+            #print(output_tuple[1])
             #output_tuple = output_result.get(timeout=1)
             if output_tuple[0] > max_delta:
                 max_delta = output_tuple[0]
                 max_pair = output_tuple[1]
-                adj_to_change = adj_to_change
-        print(max_delta)
-        print(max_pair)
+                adj_to_change = output_tuple[2]
         
-        change_the_adj(adj_to_change, i, j, beta, epsilon, missing_p)
+        change_the_adj(adj_to_change, max_pair[1], max_pair[0], beta, epsilon, missing_p)
         #end
         
         #ok so we found the max_delta
         #let us change the trees
         
         G.add_edge(max_pair[0],max_pair[1])
-        return G
+        stop = time.time()
+        if verbose:
+            print(max_delta)
+            print(max_pair)
+            print("Iteration time = %f" % (stop - start))
+            print("Overall time = %f" % (stop - overall_start))
     #end
-    
-    f = open(cascade_directory + graph_name + '_NETINF_mult.p','wb')
+    if not verbose:
+        print("Overall time = %f" % (stop - overall_start))
+    f = open(cascade_directory + graph_name + '_newINF_mult.p','wb')
     pickle.dump(G,f)
     f.close()
     

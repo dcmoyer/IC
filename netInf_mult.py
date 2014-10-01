@@ -132,7 +132,7 @@ def find_next_link_no_iter(input):
     #end
     return (delta, (j,i),trees_to_change_temp)
     
-def NetInf(k, graph_name, number_of_cascades, cascade_directory, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
+def NetInf(k, graph_name, number_of_cascades, cascade_directory,verbose = False, num_threads = 8, time_evaluator= stats.expon.pdf, beta = 0.5, epsilon = 0.0001):
     #
     #Initialization
     #
@@ -202,9 +202,6 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, num_threads = 8
                 max_delta = output_tuple[0]
                 trees_to_change_max = output_tuple[2]
                 max_pair = output_tuple[1]
-        
-        print(max_delta)
-        print(max_pair)
         #end
         
         #ok so we found the max_delta
@@ -217,10 +214,14 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, num_threads = 8
         #end
         G.add_edge(max_pair[0],max_pair[1])
         stop = time.time()
-        print("Iteration time = %f" % (stop - start))
-        print("Overall time = %f" % (stop - overall_start))
+        if verbose:
+            print(max_delta)
+            print(max_pair)
+            print("Iteration time = %f" % (stop - start))
+            print("Overall time = %f" % (stop - overall_start))
     #end
-    
+    if not verbose:
+        print("Overall time = %f" % (stop - overall_start))
     f = open(cascade_directory + graph_name + '_NETINF_mult.p','wb')
     pickle.dump(G,f)
     f.close()
