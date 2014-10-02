@@ -135,9 +135,44 @@ def generate_ba_graph(n,m=2,file_name='test_graph.p',directory_path='./cascade_d
     pl.savefig('test.png')
     return G
 
+def generate_pc_graph(n,m=2, p=0.5,file_name='test_graph.p',directory_path='./cascade_data/'):
+    G = nx.powerlaw_cluster_graph(n,m,p)
+    f = open(directory_path+file_name,'wb')
+    pickle.dump(G,f)
+    f.close()
+    #nx.draw(G)
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, node_size=20)
+    nx.draw_networkx_edges(G, pos)
+    pl.savefig('test.png')
+    return G
+
+def generate_kron_graph(iterations = 1, seed = np.array([[0.962,0.107],[0.107,0.962]]), file_name='test_graph.p',directory_path='./cascade_data/'):
+    from apgl.graph import *
+    from apgl.generator.KroneckerGenerator import KroneckerGenerator
+    
+    initialGraph = SparseGraph(2)
+    for i in range(2):
+        for j in range(2):
+            initialGraph[i,j] = seed[i,j]
+            
+    generator = KroneckerGenerator(initialGraph, iterations)
+    graph = generator.generate()
+    G = nx.DiGraph(graph.adjacencyMatrix())
+    f = open(directory_path+file_name,'wb')
+    pickle.dump(G,f)
+    f.close()
+    #nx.draw(G)
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, node_size=20)
+    nx.draw_networkx_edges(G, pos)
+    pl.savefig('test.png')
+    return G
+
 if __name__ == '__main__':
     np.random.seed(1919)
-    generate_ba_graph(100)
+    generate_pc_graph(50)
+    #generate_ba_graph(100)
     #generate_sc(100)
     #generate_gnr(100)
     #generate_forest_fire_network(100,reverse_flag=False)

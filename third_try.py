@@ -27,44 +27,41 @@ cascade_adjacencies = []
 timings = []
 LOG_EPSILON = 1
 
-##TODO: shift this function into parallel!
-def change_the_adj(adj_to_change, i,j, beta, epsilon, missing_p):
+def change_the_adj(input):
+    c, i,j, beta, epsilon, missing_p = input
     time_evaluator = stats.expon.pdf
-    delta = 0
-    for c in adj_to_change:
-        current_cascade = cascade_list[c]
-        A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
-        already_selected = [current_cascade[0][1]] #add index of source
-        for index in range(len(current_cascade)):
-            if(index == 0):
-                continue
-            for parent_index in range(index):
-                for x in not_seen_list[c]:
-                    #if the double jump occurs or half of the jump occurs and the otherhalf has just been added
-                    if( ((current_cascade[parent_index][1],x) in G.edges() or ((j,i) == (current_cascade[parent_index][1],x))) \
-                        and ((x,current_cascade[index][1]) in G.edges() or ((j,i) == (current_cascade[index][1],x)))):
-                        # P(j,x)*P(x,i) = p \beta^2 * (\frac{1}{2} * \Delta_{j,i})
-                        A[x,current_cascade[index][1]] = missing_p * beta * beta\
-                            * (time_evaluator((current_cascade[index][0] - current_cascade[parent_index][0])/2) ** 2)
-                #end
-                if( ((current_cascade[parent_index][1],current_cascade[index][1]) in G.edges()) or \
-                    ((current_cascade[parent_index][1],current_cascade[index][1]) == (j,i))):
-                    A[current_cascade[parent_index][1],current_cascade[index][1]] = beta * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
-                else:
-                    A[current_cascade[parent_index][1],current_cascade[index][1]] = epsilon * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
+    current_cascade = cascade_list[c]
+    A = np.zeros(shape=(len(G.nodes()),len(G.nodes())))
+    already_selected = [current_cascade[0][1]] #add index of source
+    for index in range(len(current_cascade)):
+        if(index == 0):
+            continue
+        for parent_index in range(index):
+            for x in not_seen_list[c]:
+                #if the double jump occurs or half of the jump occurs and the otherhalf has just been added
+                if( ((current_cascade[parent_index][1],x) in G.edges() or ((j,i) == (current_cascade[parent_index][1],x))) \
+                    and ((x,current_cascade[index][1]) in G.edges() or ((j,i) == (current_cascade[index][1],x)))):
+                    # P(j,x)*P(x,i) = p \beta^2 * (\frac{1}{2} * \Delta_{j,i})
+                    A[x,current_cascade[index][1]] = missing_p * beta * beta\
+                        * (time_evaluator((current_cascade[index][0] - current_cascade[parent_index][0])/2) ** 2)
             #end
-        #select parents
-        #this sub-problem is NP-hard?
-        '''for x in not_seen_list[c]:
-            index = np.argmax(A[x,:])
-            while(np.argmax(A[:,index]) != x and A[x,index] != 0):
-                A[x,index] = 0
-            if(A[x,index] == 0):
-                continue
-            A[x,:] = A[x,:] * np.zeros(shape=(1,len(A[x,:])))
-        '''
-        cascade_adjacencies[c] = A
-    return
+            if( ((current_cascade[parent_index][1],current_cascade[index][1]) in G.edges()) or \
+                ((current_cascade[parent_index][1],current_cascade[index][1]) == (j,i))):
+                A[current_cascade[parent_index][1],current_cascade[index][1]] = beta * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
+            else:
+                A[current_cascade[parent_index][1],current_cascade[index][1]] = epsilon * time_evaluator(current_cascade[index][0] - current_cascade[parent_index][0])
+        #end
+    #select parents
+    #this sub-problem is NP-hard?
+    '''for x in not_seen_list[c]:
+        index = np.argmax(A[x,:])
+        while(np.argmax(A[:,index]) != x and A[x,index] != 0):
+            A[x,index] = 0
+        if(A[x,index] == 0):
+            continue
+        A[x,:] = A[x,:] * np.zeros(shape=(1,len(A[x,:])))
+    '''
+    return A
 
 def find_next_link_with_adj_no_iter(input):
     j,i,beta, epsilon, missing_p = input
@@ -148,6 +145,8 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
     global cascade_adjacencies
     global timings
     
+    overall_start = time.time()
+    
     for c in range(number_of_cascades):
         f = open(cascade_directory + graph_name + '/' +graph_name + '_' + str(c) + '.p', 'rb')
         current_cascade = pickle.load(f)
@@ -166,11 +165,18 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
     #
     #Actual Algorithm
     #
-    change_the_adj(range(number_of_cascades), -1, -1, beta, epsilon, missing_p)
-    overall_start = time.time()
-    for i in range(k):
+    block_size = number_of_cascades//(num_threads) + 1
+    pool = Pool(num_threads)
+    tasks = [(c, -1,-1, beta, epsilon, missing_p) for c in range(number_of_cascades)]
+    output = pool.imap(change_the_adj, tasks,block_size)
+    pool.close()
+    pool.join()
+    for adj in range(number_of_cascades):
+        cascade_adjacencies[adj] = output.next()
+    #change_the_adj(range(number_of_cascades), -1, -1, beta, epsilon, missing_p)
+    for step in range(k):
         
-        print(i)
+        print(step)
         start = time.time()
         #initial shifts
         #deltas = np.zeros(shape=(len(G.nodes())))
@@ -209,7 +215,18 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
                 max_pair = output_tuple[1]
                 adj_to_change = output_tuple[2]
         
-        change_the_adj(adj_to_change, max_pair[1], max_pair[0], beta, epsilon, missing_p)
+        block_size = len(adj_to_change)//(num_threads) + 1
+        pool = Pool(num_threads)
+        tasks = [(c, max_pair[1], max_pair[0], beta, epsilon, missing_p) for c in adj_to_change]
+        output = pool.imap(change_the_adj, tasks,block_size)
+        #output = map(change_the_adj, tasks)
+        pool.close()
+        pool.join()
+        
+        for adj in range(len(adj_to_change)):
+            cascade_adjacencies[adj_to_change[adj]] = output.next()
+        
+        #change_the_adj(adj_to_change, max_pair[1], max_pair[0], beta, epsilon, missing_p)
         #end
         
         #ok so we found the max_delta

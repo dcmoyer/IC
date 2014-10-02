@@ -21,7 +21,7 @@ def diff(a, b):
 print('\nBASELINE ACCURACY:\n')
 
 f = open(cascade_directory + graph_name + '_NETINF_mult.p','rb')
-G = pickle.load(f)
+G = pickle.load(f).to_undirected()
 f.close()
 
 f = open(cascade_directory + graph_name + '.p','rb')
@@ -40,7 +40,7 @@ print('Type 1 error: ' + str(len(diff(E_objected,G.edges()))/float(len(E_objecte
 print('\nNew ACCURACY:\n')
 
 f = open(cascade_directory + graph_name + '_newINF_mult.p','rb')
-G = pickle.load(f)
+G = pickle.load(f).to_undirected()
 f.close()
 
 f = open(cascade_directory + graph_name + '.p','rb')
