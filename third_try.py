@@ -4,13 +4,13 @@
 #
 #
 
-import matplotlib
-matplotlib.use('Agg')
+#import matplotlib
+#matplotlib.use('Agg')
 
 import networkx as nx
 import numpy as np
 import pickle
-import matplotlib.pyplot as pl
+#import matplotlib.pyplot as pl
 import csv
 from scipy import stats
 from multiprocessing import Pool
@@ -242,7 +242,7 @@ def NetInf(k, graph_name, number_of_cascades, cascade_directory, missing_p, verb
     #end
     if not verbose:
         print("Overall time = %f" % (stop - overall_start))
-    f = open(cascade_directory + graph_name + '_newINF_mult.p','wb')
+    f = open(cascade_directory + graph_name + '_newINF' + str(missing_p) + '_mult.p','wb')
     pickle.dump(G,f)
     f.close()
     
