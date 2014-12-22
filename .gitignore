@@ -46,3 +46,9 @@ cascade_data/*
 cascade_data/ba_100/*
 *.pyc
 *.zip
+
+
+
+results/*
+plots/*
+*.png
